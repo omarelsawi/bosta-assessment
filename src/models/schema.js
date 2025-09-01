@@ -19,22 +19,17 @@ const createBooksTableQuery = `
 const createBorrowCheckoutsTableQuery = `
     CREATE TABLE IF NOT EXISTS borrow_checkouts (
     id SERIAL PRIMARY KEY,
-    borrower_id INTEGER NOT NULL REFERENCES borrowers(id)
-      );`;
-const createBorrowedBooksTableQuery = `
-    CREATE TABLE IF NOT EXISTS borrowed_books (
-    checkout_id INTEGER NOT NULL REFERENCES borrow_checkouts(id),
+    borrower_id INTEGER NOT NULL REFERENCES borrowers(id),
     book_id INTEGER NOT NULL REFERENCES books(id),
+    checkout_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     due_date DATE NOT NULL,
     is_returned BOOLEAN NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (checkout_id, book_id)
       );`;
 
 const createTables = async () => {
     await client.query(createBorrowerTableQuery);
     await client.query(createBooksTableQuery);
     await client.query(createBorrowCheckoutsTableQuery);
-    await client.query(createBorrowedBooksTableQuery);
 }
 
 export default createTables;
