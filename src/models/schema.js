@@ -23,7 +23,7 @@ const createBorrowCheckoutsTableQuery = `
     book_id INTEGER NOT NULL REFERENCES books(id),
     checkout_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     due_date DATE NOT NULL,
-    is_returned BOOLEAN NOT NULL DEFAULT FALSE,
+    is_returned BOOLEAN NOT NULL DEFAULT FALSE
       );`;
 
 const createTables = async () => {
