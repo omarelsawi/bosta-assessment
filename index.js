@@ -71,6 +71,23 @@ const getBorrowers = async () => {
   const res = await client.query(query);
   return res.rows;
 }
+
+const updateBorrower = async (id, body) => {
+  const query = `
+        UPDATE borrowers
+        SET name = $1, email = $2
+        WHERE id = $3
+        RETURNING *;
+      `;
+      const values = [body.name, body.email, id];
+
+      const res = await client.query(query, values);
+      return res.rows[0];
+}
+
+
+
+
 const parseJsonBody = (req) => {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -104,7 +121,9 @@ const server = createServer(async (req, res) => {
         res.setHeader("Content-Type", "text/plain");
         res.end("Delete Book");
     }
-  } else if (req.url === "/borrowers") {
+  } else if (req.url.startsWith("/borrowers")) {
+    const urlSegments = req.url.split("/");
+    let body = {};
     switch (req.method) {
       case "GET":
         res.setHeader("Content-Type", "application/json");
@@ -118,7 +137,7 @@ const server = createServer(async (req, res) => {
         } finally {break;}
       case "POST":
         res.setHeader("Content-Type", "application/json");
-        const body = await parseJsonBody(req);
+        body = await parseJsonBody(req);
         try{
           const queryResponse = await addBorrower(body.name, body.email);
           res.statusCode = 200;
@@ -128,9 +147,18 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ error: err.message }));
         } finally {break;}
       case "PUT":
-        res.statusCode = 200;
-        res.setHeader("Content-Type", "text/plain");
-        res.end("Put Borrower");
+        if(urlSegments.length <= 2) break;
+        res.setHeader("Content-Type", "application/json");
+        body = await parseJsonBody(req);
+        const id = urlSegments[2]; // e.g. /borrowers/3 → id=3
+        try{
+          const queryResponse = await updateBorrower(id, body);
+          res.statusCode = 200;
+          res.end(JSON.stringify(queryResponse));
+        } catch (err) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: err.message }));
+        } finally {break;}
       case "DELETE":
         res.statusCode = 200;
         res.setHeader("Content-Type", "text/plain");
