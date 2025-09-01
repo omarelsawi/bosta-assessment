@@ -85,6 +85,16 @@ const updateBorrower = async (id, body) => {
       return res.rows[0];
 }
 
+const deleteBorrower = async (id) => {
+      const query = `
+        DELETE FROM borrowers
+        WHERE id = $1
+        RETURNING *;
+      `;
+
+      const res = await client.query(query, [id]);
+      return res.rows[0];
+}
 
 
 
@@ -123,6 +133,7 @@ const server = createServer(async (req, res) => {
     }
   } else if (req.url.startsWith("/borrowers")) {
     const urlSegments = req.url.split("/");
+    const id = urlSegments.length > 2 ? urlSegments[2] : null;
     let body = {};
     switch (req.method) {
       case "GET":
@@ -137,8 +148,8 @@ const server = createServer(async (req, res) => {
         } finally {break;}
       case "POST":
         res.setHeader("Content-Type", "application/json");
-        body = await parseJsonBody(req);
         try{
+          body = await parseJsonBody(req);
           const queryResponse = await addBorrower(body.name, body.email);
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
@@ -147,12 +158,13 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ error: err.message }));
         } finally {break;}
       case "PUT":
-        if(urlSegments.length <= 2) break;
         res.setHeader("Content-Type", "application/json");
-        body = await parseJsonBody(req);
-        const id = urlSegments[2]; // e.g. /borrowers/3 → id=3
         try{
+          if(!id) throw new Error('Id needs to be specified');
+          if(isNaN(id)) throw new Error('Id must be a number');
+          body = await parseJsonBody(req);
           const queryResponse = await updateBorrower(id, body);
+          if (!queryResponse) throw new Error('Borrower not found');
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
@@ -160,9 +172,18 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ error: err.message }));
         } finally {break;}
       case "DELETE":
-        res.statusCode = 200;
-        res.setHeader("Content-Type", "text/plain");
-        res.end("Delete Borrower");
+        res.setHeader("Content-Type", "application/json");
+        try{
+          if(!id) throw new Error('Id needs to be specified');
+          if(isNaN(id)) throw new Error('Id must be a number');
+          const queryResponse = await deleteBorrower(id);
+          if (!queryResponse) throw new Error('Borrower not found');
+          res.statusCode = 200;
+          res.end(JSON.stringify(queryResponse));
+        } catch (err) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: err.message }));
+        } finally {break;}
     }
   } else {
     res.statusCode = 200;
