@@ -12,6 +12,7 @@ const createBooksTableQuery = `
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         author VARCHAR(255) NOT NULL,
+        isbn VARCHAR(255) NOT NULL,
         quantity INT NOT NULL CHECK (quantity >= 0),
         shelf_location VARCHAR(100)
       );`;
