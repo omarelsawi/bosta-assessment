@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createServer } from "http";
 import client from "./src/config/db.js";
 import createTables from "./src/models/schema.js";
