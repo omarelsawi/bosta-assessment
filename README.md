@@ -26,10 +26,9 @@ Before you begin, ensure you have the following installed:
     *   Click "Save".
     * Right-click on your server and select "Create" > "Database"
     * Name the database bosta_assessment
-    
-4.  **Use `.env` file**: use the .env file from the following link:
-https://drive.google.com/file/d/1bDzsmau3-mOo8f1aXmF1xpjq-bhxzMx3/view?usp=sharing
 
+4.  **Use `.env` file**: use the .env file from the following link:
+"https://drive.google.com/file/d/1bDzsmau3-mOo8f1aXmF1xpjq-bhxzMx3/view?usp=sharing" by placing it in the root directory. if your username in postgreSQL is not postgres, then change it to your username or set the username to postgres.
 ## Running the Application
 
 1.  **Install dependencies**:
