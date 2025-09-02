@@ -11,22 +11,33 @@ import {
 import parseJsonBody from "../utils/parser.js";
 
 const borrowerRoutes = async (req, res) => {
-  const urlSegments = req.url.split("/");
-  const id = urlSegments.length > 2 ? urlSegments[2] : null;
-  let body = {};
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const { pathname } = url;
+  const pathSegments = pathname.split("/").filter(Boolean);
+
   res.setHeader("Content-Type", "application/json");
+  let body = {};
 
   // Route: /borrowers/:id/listBooks
-  if (id && urlSegments[3] === "listBooks") {
+  if (
+    pathSegments.length === 3 &&
+    pathSegments[0] === "borrowers" &&
+    !isNaN(pathSegments[1]) &&
+    pathSegments[2] === "listBooks"
+  ) {
+    const id = pathSegments[1];
     switch (req.method) {
       case "GET":
         try {
-          if (isNaN(id)) throw new Error("ID must be a number");
           const queryResponse = await getBorrowersBooks(id);
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Borrower not found");
+          }
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -41,19 +52,30 @@ const borrowerRoutes = async (req, res) => {
     }
   }
   // Route: /borrowers/:id/return
-  else if (id && urlSegments[3] === "return") {
+  else if (
+    pathSegments.length === 3 &&
+    pathSegments[0] === "borrowers" &&
+    !isNaN(pathSegments[1]) &&
+    pathSegments[2] === "return"
+  ) {
+    const id = pathSegments[1];
     switch (req.method) {
       case "POST":
         try {
-          if (isNaN(id)) throw new Error("ID must be a number");
           body = await parseJsonBody(req);
-          if (!body.checkoutId) throw new Error("CheckoutId is required");
+          if (!body.checkoutId) {
+            res.statusCode = 400;
+            throw new Error("CheckoutId is required");
+          }
           const queryResponse = await returnBook(body.checkoutId, id);
-          if (!queryResponse) throw new Error("This checkout ID doesn't exist");
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Checkout record not found for this borrower.");
+          }
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -68,30 +90,39 @@ const borrowerRoutes = async (req, res) => {
     }
   }
   // Route: /borrowers/:id
-  else if (id) {
+  else if (
+    pathSegments.length === 2 &&
+    pathSegments[0] === "borrowers" &&
+    !isNaN(pathSegments[1])
+  ) {
+    const id = pathSegments[1];
     switch (req.method) {
       case "PUT":
         try {
-          if (isNaN(id)) throw new Error("Id must be a number");
           body = await parseJsonBody(req);
           const queryResponse = await updateBorrower(id, body);
-          if (!queryResponse) throw new Error("Borrower not found");
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Borrower not found");
+          }
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
       case "DELETE":
         try {
-          if (isNaN(id)) throw new Error("Id must be a number");
           const queryResponse = await deleteBorrower(id);
-          if (!queryResponse) throw new Error("Borrower not found");
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Borrower not found");
+          }
           res.statusCode = 200;
-          res.end(JSON.stringify(queryResponse));
+          res.end(JSON.stringify({ message: "Borrower deleted successfully" }));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -106,7 +137,7 @@ const borrowerRoutes = async (req, res) => {
     }
   }
   // Route: /borrowers
-  else {
+  else if (pathSegments.length === 1 && pathSegments[0] === "borrowers") {
     switch (req.method) {
       case "GET":
         try {
@@ -114,18 +145,23 @@ const borrowerRoutes = async (req, res) => {
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ error: err.message }));
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "Internal Server Error" }));
         }
         break;
       case "POST":
         try {
           body = await parseJsonBody(req);
-          const queryResponse = await addBorrower(body.name, body.email);
-          res.statusCode = 200;
+          const { name, email } = body;
+          if (!name || !email) {
+            res.statusCode = 400;
+            throw new Error("Missing required fields: name, email");
+          }
+          const queryResponse = await addBorrower(name, email);
+          res.statusCode = 201;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -138,6 +174,9 @@ const borrowerRoutes = async (req, res) => {
         );
         break;
     }
+  } else {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "Not Found" }));
   }
 };
 

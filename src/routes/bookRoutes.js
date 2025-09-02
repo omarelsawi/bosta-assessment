@@ -13,35 +13,46 @@ import parseJsonBody from "../utils/parser.js";
 
 const bookRoutes = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const urlSegments = req.url.split("/");
-  const secondSegment = urlSegments.length > 2 ? urlSegments[2] : null;
-  let body = {};
+  const { pathname } = url;
   const searchParams = url.searchParams.get("search");
+  const pathSegments = pathname.split("/").filter(Boolean); // e.g., /books/123 -> ['books', '123']
+
   res.setHeader("Content-Type", "application/json");
+  let body = {};
 
   // Route: /books/:id/checkout
-  if (!isNaN(secondSegment) && urlSegments[3] === "checkout") {
+  if (
+    pathSegments.length === 3 &&
+    pathSegments[0] === "books" &&
+    !isNaN(pathSegments[1]) &&
+    pathSegments[2] === "checkout"
+  ) {
+    const id = pathSegments[1];
     switch (req.method) {
       case "POST":
         try {
           body = await parseJsonBody(req);
-          if(!body.borrowerId){
-            res.statusCode = 400
-            throw new Error('Borrower ID is required')
+          if (!body.borrowerId) {
+            res.statusCode = 400;
+            throw new Error("Borrower ID is required");
           }
-          if(!body.dueDate){
-            res.statusCode = 400
-            throw new Error('Due Date is required')
+          if (!body.dueDate) {
+            res.statusCode = 400;
+            throw new Error("Due Date is required");
           }
           const queryResponse = await checkoutBook(
             body.borrowerId,
-            secondSegment,
+            id,
             body.dueDate
           );
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Book or Borrower not found, or book is unavailable.");
+          }
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          if(!res.statusCode) res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -56,7 +67,11 @@ const bookRoutes = async (req, res) => {
     }
   }
   // Route: /books/overdue
-  else if (secondSegment === "overdue") {
+  else if (
+    pathSegments.length === 2 &&
+    pathSegments[0] === "books" &&
+    pathSegments[1] === "overdue"
+  ) {
     switch (req.method) {
       case "GET":
         try {
@@ -64,8 +79,8 @@ const bookRoutes = async (req, res) => {
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
-          res.end(JSON.stringify({ error: err.message }));
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "Internal Server Error" }));
         }
         break;
       default:
@@ -79,29 +94,39 @@ const bookRoutes = async (req, res) => {
     }
   }
   // Route: /books/:id
-  else if (!isNaN(secondSegment)) {
+  else if (
+    pathSegments.length === 2 &&
+    pathSegments[0] === "books" &&
+    !isNaN(pathSegments[1])
+  ) {
+    const id = pathSegments[1];
     switch (req.method) {
       case "PUT":
         try {
           body = await parseJsonBody(req);
-          const queryResponse = await updateBook(secondSegment, body);
-          if (!queryResponse) throw new Error("Book not found");
+          const queryResponse = await updateBook(id, body);
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Book not found");
+          }
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
       case "DELETE":
         try {
-          if (isNaN(secondSegment)) throw new Error("ID must be a number");
-          const queryResponse = await deleteBook(secondSegment);
-          if (!queryResponse) throw new Error("Book not found");
+          const queryResponse = await deleteBook(id);
+          if (!queryResponse) {
+            res.statusCode = 404;
+            throw new Error("Book not found");
+          }
           res.statusCode = 200;
-          res.end(JSON.stringify(queryResponse));
+          res.end(JSON.stringify({ message: "Book deleted successfully" }));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -116,43 +141,44 @@ const bookRoutes = async (req, res) => {
     }
   }
   // Route: /books
-  else {
+  else if (pathSegments.length === 1 && pathSegments[0] === "books") {
     switch (req.method) {
       case "GET":
-        if (searchParams) {
-          try {
-            const queryResponse = await searchBook(searchParams);
-            res.statusCode = 200;
-            res.end(JSON.stringify(queryResponse));
-          } catch (err) {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ error: err.message }));
+        try {
+          let queryResponse;
+          if (searchParams) {
+            queryResponse = await searchBook(searchParams);
+          } else {
+            queryResponse = await getBooks();
           }
-        } else {
-          try {
-            const queryResponse = await getBooks();
-            res.statusCode = 200;
-            res.end(JSON.stringify(queryResponse));
-          } catch (err) {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ error: err.message }));
-          }
+          res.statusCode = 200;
+          res.end(JSON.stringify(queryResponse));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: "Internal Server Error" }));
         }
         break;
       case "POST":
         try {
           body = await parseJsonBody(req);
+          const { title, author, isbn, quantity, shelf_location } = body;
+          if (!title || !author || !isbn || quantity === undefined || !shelf_location) {
+            res.statusCode = 400;
+            throw new Error(
+              "The following fields are required: title, author, isbn, quantity, shelf_location"
+            );
+          }
           const queryResponse = await addBook(
-            body.title,
-            body.author,
-            body.isbn,
-            body.quantity,
-            body.shelf_location
+            title,
+            author,
+            isbn,
+            quantity,
+            shelf_location
           );
-          res.statusCode = 200;
+          res.statusCode = 201;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
-          res.statusCode = 400;
+          res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
         break;
@@ -165,6 +191,9 @@ const bookRoutes = async (req, res) => {
         );
         break;
     }
+  } else {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "Not Found" }));
   }
 };
 
