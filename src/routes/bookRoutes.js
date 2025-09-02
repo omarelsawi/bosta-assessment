@@ -5,6 +5,10 @@ import {
   deleteBook,
   searchBook,
 } from "../controllers/booksController.js";
+import {
+  checkoutBook,
+  getOverdueBooks
+} from "../controllers/borrowerCheckoutController.js";
 import parseJsonBody from "../utils/parser.js";
 
 const bookRoutes = async (req, res) => {
@@ -16,7 +20,18 @@ const bookRoutes = async (req, res) => {
   switch (req.method) {
     case "GET":
       res.setHeader("Content-Type", "application/json");
-      if (!searchParams) {
+      if (urlSegments[2] === 'overdue'){
+        try {
+          const queryResponse = await getOverdueBooks();
+          res.statusCode = 200;
+          res.end(JSON.stringify(queryResponse));
+        } catch (err) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: err.message }));
+        } finally {
+          break;
+        }
+      } else if (!searchParams) {
         try {
           const queryResponse = await getBooks();
           res.statusCode = 200;
@@ -41,10 +56,11 @@ const bookRoutes = async (req, res) => {
       }
     case "POST":
       res.setHeader("Content-Type", "application/json");
+      console.log(urlSegments);
       if (urlSegments[3] === "checkout") {
         try {
           body = await parseJsonBody(req);
-          checkoutBook(borrowerId, bookId);
+          const queryResponse = await checkoutBook(body.borrowerId, id, body.dueDate);
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
