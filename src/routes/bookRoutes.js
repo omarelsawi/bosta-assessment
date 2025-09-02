@@ -52,6 +52,15 @@ const bookRoutes = async (req, res) => {
           res.statusCode = 200;
           res.end(JSON.stringify(queryResponse));
         } catch (err) {
+          if (err.message === "new row for relation \"borrow_checkouts\" violates check constraint \"borrow_checkouts_check\""){
+            err.message = "Due date must be after checkout date"
+          } else if (err.message === "insert or update on table \"borrow_checkouts\" violates foreign key constraint \"borrow_checkouts_book_id_fkey\""){
+            err.message = "This book does not exist"
+          } else if (err.message === "insert or update on table \"borrow_checkouts\" violates foreign key constraint \"borrow_checkouts_borrower_id_fkey\""){
+            err.message = "This borrower does not exist"
+          } else if (err.message === "new row for relation \"books\" violates check constraint \"books_quantity_check\""){
+            err.message = "There are no remaining copies of this book"
+          }
           res.statusCode = res.statusCode || 400;
           res.end(JSON.stringify({ error: err.message }));
         }
